@@ -375,11 +375,14 @@ export async function getOapiAccessToken(
       }
     }
 
-    // Manual token request
-    const response = await fetch("https://oapi.dingtalk.com/gettoken", {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    // Manual token request - requires appKey and appSecret
+    if (!config.appKey || !config.appSecret) {
+      return null;
+    }
+
+    const response = await fetch(
+      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(config.appKey)}&appsecret=${encodeURIComponent(config.appSecret)}`,
+    );
 
     if (!response.ok) {
       return null;
@@ -408,7 +411,6 @@ async function uploadToDingTalk(filePath: string, oapiToken: string, log?: Logge
       return null;
     }
 
-    const fileStream = fs.createReadStream(absPath);
     const fileName = path.basename(absPath);
 
     // Use FormData for multipart upload

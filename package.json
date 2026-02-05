@@ -1,5 +1,5 @@
 {
-  "name": "dingtalk",
+  "name": "@simonwong/openclaw-dingtalk",
   "version": "0.2.0",
   "type": "module",
   "description": "OpenClaw DingTalk channel plugin",
@@ -39,7 +39,7 @@
       "order": 70
     },
     "install": {
-      "npmSpec": "@adongguo/dingtalk",
+      "npmSpec": "@simonwong/openclaw-dingtalk",
       "localPath": ".",
       "defaultChoice": "npm"
     }
@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.2.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

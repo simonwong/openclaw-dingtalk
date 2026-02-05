@@ -93,6 +93,39 @@ export {
   type StreamingHandlerParams,
 } from "./src/streaming-handler.js";
 
+// Card replier classes
+export {
+  CardReplier,
+  AICardReplier,
+} from "./src/card-replier.js";
+
+// Card instance classes
+export {
+  CardInstance,
+  MarkdownCardInstance,
+  MarkdownButtonCardInstance,
+  AIMarkdownCardInstance,
+} from "./src/card-instance.js";
+
+// DingTalk Stream SDK
+export {
+  DingTalkStreamClient,
+  TOPIC_ROBOT,
+  Headers,
+  AckMessage,
+  EventMessage,
+  CallbackMessage,
+  SystemMessage,
+  CallbackHandler,
+  EventHandler,
+  SystemHandler,
+  ChatbotHandler,
+  type HandlerResult,
+  type ChatbotMessageData,
+  type ChatbotReplyOptions,
+  type CallbackListenerResult,
+} from "./src/dingtalk_stream/index.js";
+
 const plugin = {
   id: "dingtalk",
   name: "DingTalk",

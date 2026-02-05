@@ -1,6 +1,9 @@
 import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
 import WebSocket from "ws";
-import { AckMessage } from "./frames.js";
+import { AckMessage, EventMessage, SystemMessage } from "./frames.js";
+import type { EventHandler, SystemHandler } from "./handlers.js";
 import type { AckParams, CallbackListenerResult, OpenConnectionResponse, RawFrame, StreamSubscription } from "./types.js";
 
 export const TOPIC_ROBOT = "/v1.0/im/bot/messages/get" as const;
@@ -25,6 +28,8 @@ type StreamClientOpts = {
 export class DingTalkStreamClient {
   private opts: StreamClientOpts;
   private callbackHandlerMap = new Map<string, CallbackHandler>();
+  private eventHandlers: EventHandler[] = [];
+  private systemHandlers: SystemHandler[] = [];
   private ws: WebSocket | null = null;
   private stopping = false;
   private preStarted = false;
@@ -44,9 +49,26 @@ export class DingTalkStreamClient {
     this.callbackHandlerMap.set(topic, handler);
   }
 
+  registerEventHandler(handler: EventHandler): void {
+    this.eventHandlers.push(handler);
+    this.isEventRequired = true;
+  }
+
+  registerSystemHandler(handler: SystemHandler): void {
+    this.systemHandlers.push(handler);
+  }
+
   preStart(): void {
     if (this.preStarted) return;
     this.preStarted = true;
+
+    // Call preStart on all handlers
+    for (const handler of this.eventHandlers) {
+      handler.preStart();
+    }
+    for (const handler of this.systemHandlers) {
+      handler.preStart();
+    }
   }
 
   async connect(): Promise<void> {
@@ -141,6 +163,88 @@ export class DingTalkStreamClient {
     };
 
     return token;
+  }
+
+  /**
+   * Upload file to DingTalk via oapi media endpoint
+   * @param filePath Local file path
+   * @param mediaType Media type: image, file, or voice
+   * @param accessToken Optional access token (will fetch if not provided)
+   * @returns media_id if successful, null otherwise
+   */
+  async uploadToDingTalk(
+    filePath: string,
+    mediaType: "image" | "file" | "voice" = "file",
+    accessToken?: string,
+  ): Promise<string | null> {
+    try {
+      const oapiToken = accessToken ?? await this.getOapiAccessToken();
+      if (!oapiToken) {
+        this.logError("[uploadToDingTalk] Failed to get oapi token");
+        return null;
+      }
+
+      if (!fs.existsSync(filePath)) {
+        this.logWarn(`[uploadToDingTalk] File not found: ${filePath}`);
+        return null;
+      }
+
+      const fileName = path.basename(filePath);
+      const formData = new FormData();
+      const fileBuffer = await fs.promises.readFile(filePath);
+      const blob = new Blob([fileBuffer]);
+      formData.append("media", blob, fileName);
+
+      this.logInfo(`[uploadToDingTalk] Uploading ${mediaType}: ${filePath}`);
+
+      const response = await fetch(
+        `https://oapi.dingtalk.com/media/upload?access_token=${oapiToken}&type=${mediaType}`,
+        { method: "POST", body: formData },
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logError(`[uploadToDingTalk] Upload failed: ${response.status} ${text}`);
+        return null;
+      }
+
+      const data = (await response.json()) as { media_id?: string; errcode?: number };
+      const mediaId = data.media_id;
+
+      if (mediaId) {
+        this.logInfo(`[uploadToDingTalk] Upload success: media_id=${mediaId}`);
+        return mediaId;
+      }
+
+      this.logWarn(`[uploadToDingTalk] No media_id returned: errcode=${data.errcode}`);
+      return null;
+    } catch (err) {
+      this.logError(`[uploadToDingTalk] Error: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get oapi access token for media operations
+   */
+  private async getOapiAccessToken(): Promise<string | null> {
+    try {
+      const response = await fetch(
+        `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(this.opts.clientId)}&appsecret=${encodeURIComponent(this.opts.clientSecret)}`,
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json()) as { errcode?: number; access_token?: string };
+      if (data.errcode === 0 && data.access_token) {
+        return data.access_token;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   private async openConnection(): Promise<OpenConnectionResponse> {
@@ -261,8 +365,20 @@ export class DingTalkStreamClient {
     }
 
     if (msgType === "SYSTEM") {
+      // Handle with custom system handlers first
+      if (this.systemHandlers.length > 0) {
+        const systemMessage = SystemMessage.fromDict(frame);
+        for (const handler of this.systemHandlers) {
+          try {
+            await handler.process(systemMessage);
+          } catch (err) {
+            this.logError(`system handler error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+
       // python: disconnect -> close
-      if (topic === "disconnect") {
+      if (topic === SystemMessage.TOPIC_DISCONNECT) {
         this.logInfo(`received disconnect topic=${topic}`);
         try {
           await this.ws?.close();
@@ -287,7 +403,27 @@ export class DingTalkStreamClient {
       return;
     }
 
-    // EVENT or unknown: ack OK to avoid redelivery
+    if (msgType === "EVENT") {
+      // Handle with custom event handlers
+      if (this.eventHandlers.length > 0) {
+        const eventMessage = EventMessage.fromDict(frame);
+        for (const handler of this.eventHandlers) {
+          try {
+            await handler.process(eventMessage);
+          } catch (err) {
+            this.logError(`event handler error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+
+      // Auto-ack event messages
+      if (messageId) {
+        this.socketCallBackResponse(messageId, { success: true });
+      }
+      return;
+    }
+
+    // Unknown type: ack OK to avoid redelivery
     if (messageId) {
       this.socketCallBackResponse(messageId, { success: true });
     }

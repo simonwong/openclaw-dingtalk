@@ -68,6 +68,10 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
   },
   groups: {
     resolveToolPolicy: resolveDingTalkGroupToolPolicy,
+    resolveRequireMention: ({ cfg }) => {
+      const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
+      return dingtalkCfg?.groupPolicy !== "open";
+    },
   },
   reload: { configPrefixes: ["channels.dingtalk"] },
   configSchema: {
@@ -94,7 +98,27 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
         mediaMaxMb: { type: "number", minimum: 0 },
         renderMode: { type: "string", enum: ["auto", "raw", "card"] },
         cooldownMs: { type: "integer", minimum: 0 },
+        aiCardMode: { type: "string", enum: ["enabled", "disabled"] },
+        sessionTimeout: { type: "integer", minimum: 0 },
+        enableMediaUpload: { type: "boolean" },
+        systemPrompt: { type: "string" },
+        gatewayToken: { type: "string" },
+        gatewayPassword: { type: "string" },
+        gatewayPort: { type: "integer", minimum: 1 },
+        debug: { type: "boolean" },
       },
+    },
+    uiHints: {
+      enabled: { label: "Enable DingTalk" },
+      appKey: { label: "App Key", sensitive: false },
+      appSecret: { label: "App Secret", sensitive: true },
+      robotCode: { label: "Robot Code", sensitive: false },
+      dmPolicy: { label: "DM Policy" },
+      groupPolicy: { label: "Group Policy" },
+      aiCardMode: { label: "AI Card Mode" },
+      sessionTimeout: { label: "Session Timeout (ms)" },
+      gatewayToken: { label: "Gateway Token", sensitive: true },
+      gatewayPassword: { label: "Gateway Password", sensitive: true },
     },
   },
   config: {
@@ -146,6 +170,17 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
       return [
         `- DingTalk groups: groupPolicy="open" allows any member to trigger (mention-gated). Set channels.dingtalk.groupPolicy="allowlist" + channels.dingtalk.groupAllowFrom to restrict senders.`,
       ];
+    },
+    resolveDmPolicy: ({ cfg }) => {
+      const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
+      return {
+        policy: dingtalkCfg?.dmPolicy || "pairing",
+        allowFrom: (dingtalkCfg?.allowFrom ?? []).map(String),
+        policyPath: "channels.dingtalk.dmPolicy",
+        allowFromPath: "channels.dingtalk.allowFrom",
+        approveHint: "使用 /allow dingtalk:<userId> 批准用户",
+        normalizeEntry: (raw: string) => raw.replace(/^(dingtalk|user|staff):/i, ""),
+      };
     },
   },
   setup: {
@@ -221,6 +256,7 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
       const port = dingtalkCfg?.webhookPort ?? null;
       ctx.setStatus({ accountId: ctx.accountId, port });
       ctx.log?.info(`starting dingtalk provider (mode: ${dingtalkCfg?.connectionMode ?? "stream"})`);
+
       return monitorDingTalkProvider({
         config: ctx.cfg,
         runtime: ctx.runtime,

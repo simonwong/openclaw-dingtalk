@@ -86,11 +86,7 @@ export const dingtalkOutbound: ChannelOutboundAdapter = {
       }
     }
 
-    if (!text?.trim()) {
-      const result = await sendTextViaOpenAPI({ config: dingtalkCfg, target: openAPITarget, content: text ?? "" });
-      return { channel: "dingtalk", conversationId: "", messageId: result.processQueryKey };
-    }
-
+    // No text and no media - nothing to send
     return { channel: "dingtalk", conversationId: "", messageId: "" };
   },
 };
