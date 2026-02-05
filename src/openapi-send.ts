@@ -53,7 +53,7 @@ export async function sendViaOpenAPI(
   const { config, target, msgKey, msgParam } = request;
   const token = await getAccessToken(config);
   // In our integration, robotCode is the same as clientId.
-  const robotCode = (config as any).clientId?.trim?.() || config.appKey?.trim() || "";
+  const robotCode = (config as any).clientId?.trim?.() || "";
 
   if (!robotCode) {
     throw new Error("[DingTalk][OpenAPI] clientId is required");

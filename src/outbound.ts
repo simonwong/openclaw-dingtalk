@@ -31,8 +31,10 @@ export const dingtalkOutbound: ChannelOutboundAdapter = {
     }
 
     const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
-    if (!dingtalkCfg?.appKey || !dingtalkCfg?.appSecret) {
-      throw new Error("[dingtalk] appKey/appSecret required for proactive send");
+    const clientId = (dingtalkCfg as any)?.clientId;
+    const clientSecret = (dingtalkCfg as any)?.clientSecret;
+    if (!clientId || !clientSecret) {
+      throw new Error("[dingtalk] clientId/clientSecret required for proactive send");
     }
 
     const openAPITarget: OpenAPISendTarget = { kind: target.kind, id: target.id };
@@ -64,8 +66,10 @@ export const dingtalkOutbound: ChannelOutboundAdapter = {
     }
 
     const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
-    if (!dingtalkCfg?.appKey || !dingtalkCfg?.appSecret) {
-      throw new Error("[dingtalk] appKey/appSecret required for proactive send");
+    const clientId = (dingtalkCfg as any)?.clientId;
+    const clientSecret = (dingtalkCfg as any)?.clientSecret;
+    if (!clientId || !clientSecret) {
+      throw new Error("[dingtalk] clientId/clientSecret required for proactive send");
     }
 
     const openAPITarget: OpenAPISendTarget = { kind: target.kind, id: target.id };
@@ -122,8 +126,14 @@ function isLocalPath(url: string): boolean {
 }
 
 async function getOapiToken(config: DingTalkConfig): Promise<string> {
+  const clientId = (config as any).clientId;
+  const clientSecret = (config as any).clientSecret;
+  if (!clientId || !clientSecret) {
+    throw new Error("[dingtalk] clientId/clientSecret required for oapi token");
+  }
+
   const response = await fetch(
-    `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(config.appKey!)}&appsecret=${encodeURIComponent(config.appSecret!)}`,
+    `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
   );
 
   if (!response.ok) {

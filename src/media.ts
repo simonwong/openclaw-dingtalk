@@ -75,7 +75,7 @@ export function extractFileMarkers(content: string, log?: Logger): ProcessedFile
 export async function uploadAndSendFile(
   filePath: string,
   fileName: string | undefined,
-  config: { appKey: string; appSecret: string; robotCode?: string },
+  config: { clientId: string; clientSecret: string },
   conversationInfo: {
     conversationType: "1" | "2";
     conversationId: string;
@@ -104,7 +104,7 @@ export async function uploadAndSendFile(
 
     // Step 1: Get oapi access token for upload
     const oapiTokenResp = await fetch(
-      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(config.appKey)}&appsecret=${encodeURIComponent(config.appSecret)}`,
+      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(config.clientId)}&appsecret=${encodeURIComponent(config.clientSecret)}`,
     );
 
     if (!oapiTokenResp.ok) {
@@ -151,8 +151,8 @@ export async function uploadAndSendFile(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        appKey: config.appKey,
-        appSecret: config.appSecret,
+        appKey: config.clientId,
+        appSecret: config.clientSecret,
       }),
     });
 
@@ -176,7 +176,7 @@ export async function uploadAndSendFile(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          robotCode: config.robotCode || config.appKey,
+          robotCode: config.clientId,
           openConversationId: conversationInfo.conversationId,
           msgKey: "sampleFile",
           msgParam: JSON.stringify({
@@ -203,7 +203,7 @@ export async function uploadAndSendFile(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          robotCode: config.robotCode || config.appKey,
+          robotCode: config.clientId,
           userIds: [conversationInfo.senderId],
           msgKey: "sampleFile",
           msgParam: JSON.stringify({
@@ -237,7 +237,7 @@ export async function uploadAndSendFile(
  */
 export async function processFileMarkers(
   content: string,
-  config: { appKey: string; appSecret: string; robotCode?: string },
+  config: { clientId: string; clientSecret: string },
   conversationInfo: {
     conversationType: "1" | "2";
     conversationId: string;
@@ -375,8 +375,8 @@ export async function getOapiAccessToken(
       }
     }
 
-    const clientId = (config as any).clientId || config.appKey;
-    const clientSecret = (config as any).clientSecret || config.appSecret;
+    const clientId = (config as any).clientId;
+    const clientSecret = (config as any).clientSecret;
 
     // Manual token request - requires clientId and clientSecret
     if (!clientId || !clientSecret) {
@@ -564,7 +564,7 @@ export async function downloadMediaDingTalk(params: {
       },
       body: JSON.stringify({
         downloadCode,
-        robotCode: robotCode || (dingtalkCfg as any).clientId || dingtalkCfg.appKey,
+        robotCode: robotCode || (dingtalkCfg as any).clientId,
       }),
     });
 
@@ -620,8 +620,8 @@ export async function uploadMediaDingTalk(params: {
   }
 
   try {
-    const clientId = (dingtalkCfg as any).clientId || dingtalkCfg.appKey;
-    const clientSecret = (dingtalkCfg as any).clientSecret || dingtalkCfg.appSecret;
+    const clientId = (dingtalkCfg as any).clientId;
+    const clientSecret = (dingtalkCfg as any).clientSecret;
     if (!clientId || !clientSecret) {
       throw new Error("DingTalk credentials not configured (clientId, clientSecret required)");
     }

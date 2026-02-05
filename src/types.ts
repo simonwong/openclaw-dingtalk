@@ -9,8 +9,7 @@ export type ResolvedDingTalkAccount = {
   accountId: string;
   enabled: boolean;
   configured: boolean;
-  appKey?: string;
-  robotCode?: string;
+  clientId?: string;
 };
 
 export type DingTalkIdType = "staffId" | "odpsUserId" | "chatId";
@@ -40,8 +39,7 @@ export type DingTalkSendResult = {
 export type DingTalkProbeResult = {
   ok: boolean;
   error?: string;
-  appKey?: string;
-  robotCode?: string;
+  clientId?: string;
   connected?: boolean;
 };
 

@@ -20,21 +20,20 @@ export async function probeDingTalk(cfg?: DingTalkConfig): Promise<DingTalkProbe
     if (!accessToken) {
       return {
         ok: false,
-        appKey: creds.clientId,
+        clientId: creds.clientId,
         error: "Failed to get access token",
       };
     }
 
     return {
       ok: true,
-      appKey: creds.clientId,
-      robotCode: creds.robotCode,
+      clientId: creds.clientId,
       connected: true,
     };
   } catch (err) {
     return {
       ok: false,
-      appKey: creds.clientId,
+      clientId: creds.clientId,
       error: err instanceof Error ? err.message : String(err),
     };
   }

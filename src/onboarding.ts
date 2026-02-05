@@ -97,7 +97,7 @@ async function noteDingTalkCredentialHelp(prompter: WizardPrompter): Promise<voi
       "3) Get AppKey (ClientID) and AppSecret (ClientSecret) from Credentials page",
       "4) Enable Robot capability and select Stream mode",
       "5) Publish the app or add to test group",
-      "Tip: you can also set DINGTALK_APP_KEY / DINGTALK_APP_SECRET env vars.",
+      "Tip: you can also set DINGTALK_CLIENT_ID / DINGTALK_CLIENT_SECRET env vars.",
       `Docs: ${formatDocsLink("/channels/dingtalk", "dingtalk")}`,
     ].join("\n"),
     "DingTalk credentials",
@@ -166,7 +166,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
     if (!configured) {
       statusLines.push("DingTalk: needs app credentials");
     } else if (probeResult?.ok) {
-      statusLines.push(`DingTalk: connected (${probeResult.appKey ?? "bot"})`);
+      statusLines.push(`DingTalk: connected (${probeResult.clientId ?? "bot"})`);
     } else {
       statusLines.push("DingTalk: configured (connection not verified)");
     }
@@ -183,11 +183,11 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
   configure: async ({ cfg, prompter }) => {
     const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
     const resolved = resolveDingTalkCredentials(dingtalkCfg);
-    const hasConfigCreds = Boolean(dingtalkCfg?.appKey?.trim() && dingtalkCfg?.appSecret?.trim());
+    const hasConfigCreds = Boolean((dingtalkCfg as any)?.clientId?.trim?.() && (dingtalkCfg as any)?.clientSecret?.trim?.());
     const canUseEnv = Boolean(
       !hasConfigCreds &&
-        process.env.DINGTALK_APP_KEY?.trim() &&
-        process.env.DINGTALK_APP_SECRET?.trim(),
+        process.env.DINGTALK_CLIENT_ID?.trim() &&
+        process.env.DINGTALK_CLIENT_SECRET?.trim(),
     );
 
     let next = cfg;
@@ -200,7 +200,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
 
     if (canUseEnv) {
       const keepEnv = await prompter.confirm({
-        message: "DINGTALK_APP_KEY + DINGTALK_APP_SECRET detected. Use env vars?",
+        message: "DINGTALK_CLIENT_ID + DINGTALK_CLIENT_SECRET detected. Use env vars?", 
         initialValue: true,
       });
       if (keepEnv) {
@@ -208,7 +208,12 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
           ...(next as any),
           channels: {
             ...(((next as any).channels ?? {}) as any),
-            dingtalk: { ...((((next as any).channels ?? {}) as any).dingtalk ?? {}), enabled: true },
+            dingtalk: {
+              ...((((next as any).channels ?? {}) as any).dingtalk ?? {}),
+              enabled: true,
+              clientId: String(process.env.DINGTALK_CLIENT_ID ?? "").trim(),
+              clientSecret: String(process.env.DINGTALK_CLIENT_SECRET ?? "").trim(),
+            },
           },
         } as OpenClawConfig;
       } else {
@@ -279,7 +284,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
         const probe = await probeDingTalk(testCfg);
         if (probe.ok) {
           await prompter.note(
-            `Connected (${probe.appKey ?? "bot"})`,
+            `Connected (${probe.clientId ?? "bot"})`,
             "DingTalk connection test",
           );
         } else {

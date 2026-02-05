@@ -65,8 +65,8 @@ export async function getAccessToken(config: DingTalkConfig): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      appKey: (config as any).clientId || config.appKey,
-      appSecret: (config as any).clientSecret || config.appSecret,
+      appKey: (config as any).clientId,
+      appSecret: (config as any).clientSecret,
     }),
   });
 
@@ -150,7 +150,7 @@ export async function createAICard(
     if (isGroup) {
       deliverBody.openSpaceId = `dtv1.card//IM_GROUP.${data.conversationId}`;
       deliverBody.imGroupOpenDeliverModel = {
-        robotCode: config.appKey,
+        robotCode: (config as any).clientId,
       };
     } else {
       const userId = data.senderStaffId || data.senderId;

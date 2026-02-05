@@ -87,7 +87,7 @@ export class CardReplier {
         deliverBody.openSpaceId = `dtv1.card//IM_GROUP.${this.messageData.conversationId}`;
         deliverBody.imGroupOpenDeliverModel = {
           // robotCode is the bot identifier. In this plugin it's the same as clientId.
-          robotCode: (this.config as any).clientId || this.config.appKey,
+          robotCode: (this.config as any).clientId,
           atUserIds: atUsers ? { userIds: atUsers } : undefined,
         };
       } else {

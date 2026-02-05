@@ -35,8 +35,8 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
     normalizeAllowEntry: (entry) => entry.replace(/^(dingtalk|user|staff):/i, ""),
     notifyApproval: async ({ cfg, id }) => {
       const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
-      const clientId = (dingtalkCfg as any)?.clientId || dingtalkCfg?.appKey;
-      const clientSecret = (dingtalkCfg as any)?.clientSecret || dingtalkCfg?.appSecret;
+      const clientId = (dingtalkCfg as any)?.clientId;
+      const clientSecret = (dingtalkCfg as any)?.clientSecret;
       if (!clientId || !clientSecret) {
         return;
       }
@@ -84,9 +84,6 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
         enabled: { type: "boolean" },
         clientId: { type: "string" },
         clientSecret: { type: "string" },
-        // Backward compatible legacy keys
-        appKey: { type: "string" },
-        appSecret: { type: "string" },
         connectionMode: { type: "string", enum: ["stream", "webhook"] },
         webhookPath: { type: "string" },
         webhookPort: { type: "integer", minimum: 1 },
@@ -116,9 +113,6 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
       enabled: { label: "Enable DingTalk" },
       clientId: { label: "Client ID", sensitive: false },
       clientSecret: { label: "Client Secret", sensitive: true },
-      // Legacy
-      appKey: { label: "App Key (legacy)", sensitive: false },
-      appSecret: { label: "App Secret (legacy)", sensitive: true },
       dmPolicy: { label: "DM Policy" },
       groupPolicy: { label: "Group Policy" },
       aiCardMode: { label: "AI Card Mode" },

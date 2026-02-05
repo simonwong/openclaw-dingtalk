@@ -81,7 +81,7 @@ export async function handleDingTalkStreamingMessage(params: StreamingHandlerPar
         const mediaResult = await downloadMediaDingTalk({
           cfg: cfgWrapper,
           downloadCode: code,
-          robotCode: data.robotCode || (config as any).clientId || config.appKey,
+          robotCode: data.robotCode || (config as any).clientId,
           client,
         });
         if (mediaResult) {
@@ -230,9 +230,8 @@ export async function handleDingTalkStreamingMessage(params: StreamingHandlerPar
         accumulated = await processFileMarkers(
           accumulated,
           {
-            appKey: (config as any).clientId || config.appKey,
-            appSecret: (config as any).clientSecret || config.appSecret,
-            robotCode: (config as any).clientId || config.appKey,
+            clientId: (config as any).clientId,
+            clientSecret: (config as any).clientSecret,
           },
           {
             conversationType: data.conversationType,
@@ -289,9 +288,8 @@ export async function handleDingTalkStreamingMessage(params: StreamingHandlerPar
     fullResponse = await processFileMarkers(
       fullResponse,
       {
-        appKey: (config as any).clientId || config.appKey,
-        appSecret: (config as any).clientSecret || config.appSecret,
-        robotCode: (config as any).clientId || config.appKey,
+        clientId: (config as any).clientId,
+        clientSecret: (config as any).clientSecret,
       },
       {
         conversationType: data.conversationType,

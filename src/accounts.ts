@@ -7,23 +7,15 @@ export function resolveDingTalkCredentials(cfg?: DingTalkConfig): {
   clientSecret: string;
   robotCode: string;
 } | null {
-  // New config names
   const clientId = (cfg as any)?.clientId?.trim?.() || "";
   const clientSecret = (cfg as any)?.clientSecret?.trim?.() || "";
-
-  // Legacy names (backward compatible)
-  const legacyId = cfg?.appKey?.trim() || "";
-  const legacySecret = cfg?.appSecret?.trim() || "";
-
-  const id = clientId || legacyId;
-  const secret = clientSecret || legacySecret;
-  if (!id || !secret) return null;
+  if (!clientId || !clientSecret) return null;
 
   // In this plugin, robotCode is the same as clientId.
   return {
-    clientId: id,
-    clientSecret: secret,
-    robotCode: id,
+    clientId,
+    clientSecret,
+    robotCode: clientId,
   };
 }
 
@@ -47,8 +39,7 @@ export function resolveDingTalkAccount(params: {
     accountId: params.accountId?.trim() || DEFAULT_ACCOUNT_ID,
     enabled,
     configured: Boolean(creds),
-    appKey: creds?.clientId,
-    robotCode: creds?.robotCode,
+    clientId: creds?.clientId,
   };
 }
 

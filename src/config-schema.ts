@@ -68,12 +68,9 @@ export const DingTalkGroupSchema = z
 export const DingTalkConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
-    // Prefer clientId/clientSecret (new names). appKey/appSecret are kept for backward compatibility.
     clientId: z.string().optional(),
     clientSecret: z.string().optional(),
-    appKey: z.string().optional(), // legacy
-    appSecret: z.string().optional(), // legacy
-    // robotCode is the same as clientId in our integration; no separate config needed.
+    // robotCode is the same as clientId in this integration; no separate config needed.
     connectionMode: DingTalkConnectionModeSchema.optional().default("stream"),
     webhookPath: z.string().optional().default("/dingtalk/events"),
     webhookPort: z.number().int().positive().optional(),
