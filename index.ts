@@ -87,11 +87,9 @@ export {
 } from "./src/gateway-stream.js";
 
 // Streaming message handler
-export {
-  handleDingTalkStreamingMessage,
-  shouldUseStreamingMode,
-  type StreamingHandlerParams,
-} from "./src/streaming-handler.js";
+// NOTE: This plugin integrates with OpenClaw via src/bot.ts (routing + bindings + sessionKey).
+// The legacy direct-Gateway streaming handler is intentionally not exported to avoid bypassing
+// OpenClaw channel routing/session semantics.
 
 // Card replier classes
 export {

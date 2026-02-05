@@ -86,7 +86,8 @@ export class CardReplier {
       if (isGroup) {
         deliverBody.openSpaceId = `dtv1.card//IM_GROUP.${this.messageData.conversationId}`;
         deliverBody.imGroupOpenDeliverModel = {
-          robotCode: this.config.appKey,
+          // robotCode is the bot identifier, not the appKey
+          robotCode: this.config.robotCode,
           atUserIds: atUsers ? { userIds: atUsers } : undefined,
         };
       } else {
