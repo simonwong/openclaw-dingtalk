@@ -1,155 +1,186 @@
+import type { ChannelPlugin, OpenClawConfig } from "openclaw/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
+import type { ResolvedDingTalkAccount, DingTalkConfig } from "./types.js";
+import { resolveDingTalkAccount, resolveDingTalkCredentials } from "./accounts.js";
+import { dingtalkOutbound } from "./outbound.js";
+import { probeDingTalk } from "./probe.js";
+import { resolveDingTalkGroupToolPolicy } from "./policy.js";
+import { normalizeDingTalkTarget, looksLikeDingTalkId } from "./targets.js";
 import {
-  buildChannelConfigSchema,
-  DEFAULT_ACCOUNT_ID,
-  deleteAccountFromConfigSection,
-  formatPairingApproveHint,
-  setAccountEnabledInConfigSection,
-  type ChannelAccountSnapshot,
-  type ChannelPlugin,
-  type ChannelStatusIssue,
-} from "openclaw/plugin-sdk";
-import { DingTalkConfigSchema } from "./config-schema.js";
-import {
-  listDingtalkAccountIds,
-  resolveDefaultDingtalkAccountId,
-  resolveDingtalkAccount,
-} from "./accounts.js";
-import type { CoreConfig, ResolvedDingtalkAccount } from "./types.js";
-import { monitorDingtalkStreamProvider } from "./stream.js";
-import { sendDingtalkTextToConversation } from "./send.js";
-import { getDingtalkRuntime } from "./runtime.js";
+  listDingTalkDirectoryPeers,
+  listDingTalkDirectoryGroups,
+  listDingTalkDirectoryPeersLive,
+  listDingTalkDirectoryGroupsLive,
+} from "./directory.js";
+import { dingtalkOnboardingAdapter } from "./onboarding.js";
 
 const meta = {
   id: "dingtalk",
   label: "DingTalk",
-  selectionLabel: "DingTalk (Stream)",
-  detailLabel: "DingTalk Bot",
+  selectionLabel: "DingTalk (钉钉)",
   docsPath: "/channels/dingtalk",
   docsLabel: "dingtalk",
-  blurb: "DingTalk bot via Stream mode (WebSocket).",
-  aliases: ["ding", "dd"],
-  order: 40,
-  quickstartAllowFrom: true,
+  blurb: "钉钉/DingTalk enterprise messaging.",
+  aliases: ["dingding"],
+  order: 70,
 };
 
-const normalizeAllowEntry = (entry: string) => entry.replace(/^(dingtalk|ding|dd):/i, "").trim();
-
-export const dingtalkPlugin: ChannelPlugin<ResolvedDingtalkAccount> = {
+export const dingtalkPlugin: ChannelPlugin<ResolvedDingTalkAccount> = {
   id: "dingtalk",
-  meta,
+  meta: {
+    ...meta,
+  },
   pairing: {
     idLabel: "dingtalkUserId",
-    normalizeAllowEntry,
-    notifyApproval: async ({ id }) => {
-      console.log(`[dingtalk] User ${id} approved for pairing`);
+    normalizeAllowEntry: (entry) => entry.replace(/^(dingtalk|user|staff):/i, ""),
+    notifyApproval: async ({ cfg, id }) => {
+      const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
+      if (!dingtalkCfg?.appKey || !dingtalkCfg?.appSecret) {
+        return;
+      }
+      try {
+        const { sendTextViaOpenAPI } = await import("./openapi-send.js");
+        const staffId = String(id).replace(/^(dingtalk|user|staff):/i, "");
+        await sendTextViaOpenAPI({
+          config: dingtalkCfg,
+          target: { kind: "user", id: staffId },
+          content: "Your pairing request has been approved. You can now send messages to the bot.",
+        });
+      } catch {
+        // Proactive send not available; silently ignore
+      }
     },
   },
   capabilities: {
-    chatTypes: ["direct", "group"],
-    media: true,
-    reactions: false,
-    threads: false,
+    chatTypes: ["direct", "channel"],
     polls: false,
-    nativeCommands: false,
-    blockStreaming: true,
+    threads: false, // DingTalk has limited thread support
+    media: true,
+    reactions: false, // DingTalk doesn't support reactions via bot API
+    edit: false, // DingTalk doesn't support message editing via sessionWebhook
+    reply: true,
+  },
+  agentPrompt: {
+    messageToolHints: () => [
+      "- DingTalk targeting: messages are sent via sessionWebhook to the current conversation.",
+      "- DingTalk supports text, markdown, and ActionCard message types.",
+    ],
+  },
+  groups: {
+    resolveToolPolicy: resolveDingTalkGroupToolPolicy,
   },
   reload: { configPrefixes: ["channels.dingtalk"] },
-  configSchema: buildChannelConfigSchema(DingTalkConfigSchema),
+  configSchema: {
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean" },
+        appKey: { type: "string" },
+        appSecret: { type: "string" },
+        robotCode: { type: "string" },
+        connectionMode: { type: "string", enum: ["stream", "webhook"] },
+        webhookPath: { type: "string" },
+        webhookPort: { type: "integer", minimum: 1 },
+        dmPolicy: { type: "string", enum: ["open", "pairing", "allowlist"] },
+        allowFrom: { type: "array", items: { oneOf: [{ type: "string" }, { type: "number" }] } },
+        groupPolicy: { type: "string", enum: ["open", "allowlist", "disabled"] },
+        groupAllowFrom: { type: "array", items: { oneOf: [{ type: "string" }, { type: "number" }] } },
+        groupSessionScope: { type: "string", enum: ["per-group", "per-user"] },
+        historyLimit: { type: "integer", minimum: 0 },
+        dmHistoryLimit: { type: "integer", minimum: 0 },
+        textChunkLimit: { type: "integer", minimum: 1 },
+        chunkMode: { type: "string", enum: ["length", "newline"] },
+        mediaMaxMb: { type: "number", minimum: 0 },
+        renderMode: { type: "string", enum: ["auto", "raw", "card"] },
+        cooldownMs: { type: "integer", minimum: 0 },
+      },
+    },
+  },
   config: {
-    listAccountIds: (cfg) => listDingtalkAccountIds(cfg as CoreConfig),
-    resolveAccount: (cfg, accountId) => resolveDingtalkAccount({ cfg: cfg as CoreConfig, accountId }),
-    defaultAccountId: (cfg) => resolveDefaultDingtalkAccountId(cfg as CoreConfig),
-    setAccountEnabled: ({ cfg, accountId, enabled }) =>
-      setAccountEnabledInConfigSection({
-        cfg,
-        sectionKey: "dingtalk",
-        accountId,
-        enabled,
-        allowTopLevel: true,
-      }),
-    deleteAccount: ({ cfg, accountId }) =>
-      deleteAccountFromConfigSection({
-        cfg,
-        sectionKey: "dingtalk",
-        accountId,
-        clearBaseFields: ["clientId", "clientSecret", "robotCode", "name"],
-      }),
-    isConfigured: (account) => Boolean(account.clientId?.trim() && account.clientSecret?.trim()),
-    describeAccount: (account): ChannelAccountSnapshot => ({
-      accountId: account.accountId,
-      name: account.name,
-      enabled: account.enabled,
-      configured: Boolean(account.clientId?.trim() && account.clientSecret?.trim()),
+    listAccountIds: () => [DEFAULT_ACCOUNT_ID],
+    resolveAccount: (cfg) => resolveDingTalkAccount({ cfg }),
+    defaultAccountId: () => DEFAULT_ACCOUNT_ID,
+    setAccountEnabled: ({ cfg, enabled }) => ({
+      ...(cfg as any),
+      channels: {
+        ...((cfg as any).channels ?? {}),
+        dingtalk: {
+          ...(((cfg as any).channels ?? {}).dingtalk ?? {}),
+          enabled,
+        },
+      },
     }),
-    resolveAllowFrom: ({ cfg, accountId }) =>
-      (resolveDingtalkAccount({ cfg: cfg as CoreConfig, accountId }).config.allowFrom ?? []).map(String),
+    deleteAccount: ({ cfg }) => {
+      const next = { ...(cfg as any) } as any;
+      const nextChannels = { ...(((cfg as any).channels ?? {}) as any) };
+      delete (nextChannels as Record<string, unknown>).dingtalk;
+      if (Object.keys(nextChannels).length > 0) {
+        next.channels = nextChannels;
+      } else {
+        delete next.channels;
+      }
+      return next as OpenClawConfig;
+    },
+    isConfigured: (_account, cfg) =>
+      Boolean(resolveDingTalkCredentials(cfg.channels?.dingtalk as DingTalkConfig | undefined)),
+    describeAccount: (account) => ({
+      accountId: account.accountId,
+      enabled: account.enabled,
+      configured: account.configured,
+    }),
+    resolveAllowFrom: ({ cfg }) =>
+      ((cfg.channels?.dingtalk as DingTalkConfig | undefined)?.allowFrom ?? []).map(String),
     formatAllowFrom: ({ allowFrom }) =>
       allowFrom
         .map((entry) => String(entry).trim())
         .filter(Boolean)
-        .map((entry) => (entry === "*" ? entry : normalizeAllowEntry(entry)))
-        .map((entry) => (entry === "*" ? entry : entry.toLowerCase())),
+        .map((entry) => entry.toLowerCase()),
   },
   security: {
-    resolveDmPolicy: ({ cfg, accountId, account }) => {
-      const resolvedAccountId = accountId ?? account.accountId ?? DEFAULT_ACCOUNT_ID;
-      const useAccountPath = Boolean((cfg as any).channels?.dingtalk?.accounts?.[resolvedAccountId]);
-      const basePath = useAccountPath
-        ? `channels.dingtalk.accounts.${resolvedAccountId}.`
-        : "channels.dingtalk.";
-      return {
-        policy: account.config.dmPolicy ?? "pairing",
-        allowFrom: account.config.allowFrom ?? [],
-        policyPath: `${basePath}dmPolicy`,
-        allowFromPath: basePath,
-        approveHint: formatPairingApproveHint("dingtalk"),
-        normalizeEntry: normalizeAllowEntry,
-      };
+    collectWarnings: ({ cfg }) => {
+      const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
+      const defaultGroupPolicy = (cfg.channels as Record<string, { groupPolicy?: string }> | undefined)?.defaults?.groupPolicy;
+      const groupPolicy = dingtalkCfg?.groupPolicy ?? defaultGroupPolicy ?? "allowlist";
+      if (groupPolicy !== "open") return [];
+      return [
+        `- DingTalk groups: groupPolicy="open" allows any member to trigger (mention-gated). Set channels.dingtalk.groupPolicy="allowlist" + channels.dingtalk.groupAllowFrom to restrict senders.`,
+      ];
     },
   },
-  messaging: {
-    normalizeTarget: (raw: string) => raw.replace(/^(dingtalk|ding|dd):/i, "").trim() || undefined,
-    targetResolver: {
-      looksLikeId: (_raw, normalized) => {
-        const v = (normalized ?? "").trim();
-        return Boolean(v);
+  setup: {
+    resolveAccountId: () => DEFAULT_ACCOUNT_ID,
+    applyAccountConfig: ({ cfg }) => ({
+      ...(cfg as any),
+      channels: {
+        ...((cfg as any).channels ?? {}),
+        dingtalk: {
+          ...(((cfg as any).channels ?? {}).dingtalk ?? {}),
+          enabled: true,
+        },
       },
-      hint: "<conversationId>",
+    }),
+  },
+  onboarding: dingtalkOnboardingAdapter,
+  messaging: {
+    normalizeTarget: normalizeDingTalkTarget,
+    targetResolver: {
+      looksLikeId: looksLikeDingTalkId,
+      hint: "<conversationId|user:staffId>",
     },
   },
-  outbound: {
-    deliveryMode: "direct",
-    chunkerMode: "markdown",
-    textChunkLimit: 4000,
-    chunker: (text, limit) => getDingtalkRuntime().channel.text.chunkMarkdownText(text, limit),
-    sendText: async ({ to, text, accountId }) => {
-      const cfg = getDingtalkRuntime().config.loadConfig() as unknown as CoreConfig;
-      const result = await sendDingtalkTextToConversation({
-        cfg,
-        accountId: accountId ?? undefined,
-        conversationId: to,
-        text,
-      });
-      if (!result.ok) {
-        throw new Error(result.error || "DingTalk send failed");
-      }
-      return { channel: "dingtalk" } as any;
-    },
-    sendMedia: async ({ to, text, mediaUrl, accountId }) => {
-      const combined = mediaUrl ? `${text}\n\nAttachment: ${mediaUrl}` : text;
-      const cfg = getDingtalkRuntime().config.loadConfig() as unknown as CoreConfig;
-      const result = await sendDingtalkTextToConversation({
-        cfg,
-        accountId: accountId ?? undefined,
-        conversationId: to,
-        text: combined,
-      });
-      if (!result.ok) {
-        throw new Error(result.error || "DingTalk send failed");
-      }
-      return { channel: "dingtalk" } as any;
-    },
+  directory: {
+    self: async () => null,
+    listPeers: async ({ cfg, query, limit }) =>
+      listDingTalkDirectoryPeers({ cfg, query, limit }),
+    listGroups: async ({ cfg, query, limit }) =>
+      listDingTalkDirectoryGroups({ cfg, query, limit }),
+    listPeersLive: async ({ cfg, query, limit }) =>
+      listDingTalkDirectoryPeersLive({ cfg, query, limit }),
+    listGroupsLive: async ({ cfg, query, limit }) =>
+      listDingTalkDirectoryGroupsLive({ cfg, query, limit }),
   },
+  outbound: dingtalkOutbound,
   status: {
     defaultRuntime: {
       accountId: DEFAULT_ACCOUNT_ID,
@@ -157,67 +188,45 @@ export const dingtalkPlugin: ChannelPlugin<ResolvedDingtalkAccount> = {
       lastStartAt: null,
       lastStopAt: null,
       lastError: null,
+      port: null,
     },
-    collectStatusIssues: (accounts) => {
-      const issues: ChannelStatusIssue[] = [];
-      for (const account of accounts) {
-        if (!account.configured) {
-          issues.push({
-            channel: "dingtalk",
-            accountId: account.accountId ?? DEFAULT_ACCOUNT_ID,
-            kind: "config",
-            message: "DingTalk clientId/clientSecret not configured",
-          });
-        }
-      }
-      return issues;
-    },
-    buildChannelSummary: async ({ snapshot }) => ({
+    buildChannelSummary: ({ snapshot }) => ({
       configured: snapshot.configured ?? false,
       running: snapshot.running ?? false,
-      mode: "stream",
       lastStartAt: snapshot.lastStartAt ?? null,
       lastStopAt: snapshot.lastStopAt ?? null,
       lastError: snapshot.lastError ?? null,
+      port: snapshot.port ?? null,
+      probe: snapshot.probe,
+      lastProbeAt: snapshot.lastProbeAt ?? null,
     }),
-    buildAccountSnapshot: ({ account, runtime }) => ({
+    probeAccount: async ({ cfg }) =>
+      await probeDingTalk(cfg.channels?.dingtalk as DingTalkConfig | undefined),
+    buildAccountSnapshot: ({ account, runtime, probe }) => ({
       accountId: account.accountId,
-      name: account.name,
       enabled: account.enabled,
-      configured: Boolean(account.clientId?.trim() && account.clientSecret?.trim()),
+      configured: account.configured,
       running: runtime?.running ?? false,
       lastStartAt: runtime?.lastStartAt ?? null,
       lastStopAt: runtime?.lastStopAt ?? null,
       lastError: runtime?.lastError ?? null,
-      lastInboundAt: (runtime as any)?.lastInboundAt ?? null,
-      lastOutboundAt: (runtime as any)?.lastOutboundAt ?? null,
+      port: runtime?.port ?? null,
+      probe,
     }),
   },
   gateway: {
     startAccount: async (ctx) => {
-      const { account, log, setStatus, abortSignal, cfg } = ctx;
-      if (!account.clientId || !account.clientSecret) {
-        throw new Error("DingTalk clientId/clientSecret not configured");
-      }
-      log?.info(`[${account.accountId}] starting DingTalk Stream client`);
-      setStatus({ accountId: account.accountId, running: true, lastStartAt: Date.now() });
-
-      try {
-        const { stop } = await monitorDingtalkStreamProvider({
-          accountId: account.accountId,
-          config: cfg as CoreConfig,
-          abortSignal,
-          statusSink: (patch) => setStatus({ accountId: account.accountId, ...patch } as any),
-        });
-        return { stop };
-      } catch (err) {
-        setStatus({
-          accountId: account.accountId,
-          running: false,
-          lastError: err instanceof Error ? err.message : String(err),
-        });
-        throw err;
-      }
+      const { monitorDingTalkProvider } = await import("./monitor.js");
+      const dingtalkCfg = ctx.cfg.channels?.dingtalk as DingTalkConfig | undefined;
+      const port = dingtalkCfg?.webhookPort ?? null;
+      ctx.setStatus({ accountId: ctx.accountId, port });
+      ctx.log?.info(`starting dingtalk provider (mode: ${dingtalkCfg?.connectionMode ?? "stream"})`);
+      return monitorDingTalkProvider({
+        config: ctx.cfg,
+        runtime: ctx.runtime,
+        abortSignal: ctx.abortSignal,
+        accountId: ctx.accountId,
+      });
     },
   },
 };

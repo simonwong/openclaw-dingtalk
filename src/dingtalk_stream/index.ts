@@ -1,1 +1,2 @@
-export { StreamClient, TOPIC_ROBOT } from "./client.js";
+export { DingTalkStreamClient, TOPIC_ROBOT } from "./stream.js";
+export type { CallbackListenerResult } from "./types.js";
