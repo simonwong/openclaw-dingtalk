@@ -3,18 +3,36 @@ import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { DingTalkConfig, ResolvedDingTalkAccount } from "./types.js";
 
 export function resolveDingTalkCredentials(cfg?: DingTalkConfig): {
-  appKey: string;
-  appSecret: string;
-  robotCode?: string;
+  clientId: string;
+  clientSecret: string;
+  robotCode: string;
 } | null {
-  const appKey = cfg?.appKey?.trim();
-  const appSecret = cfg?.appSecret?.trim();
-  if (!appKey || !appSecret) return null;
+  // New config names
+  const clientId = (cfg as any)?.clientId?.trim?.() || "";
+  const clientSecret = (cfg as any)?.clientSecret?.trim?.() || "";
+
+  // Legacy names (backward compatible)
+  const legacyId = cfg?.appKey?.trim() || "";
+  const legacySecret = cfg?.appSecret?.trim() || "";
+
+  const id = clientId || legacyId;
+  const secret = clientSecret || legacySecret;
+  if (!id || !secret) return null;
+
+  // In this plugin, robotCode is the same as clientId.
   return {
-    appKey,
-    appSecret,
-    robotCode: cfg?.robotCode?.trim() || undefined,
+    clientId: id,
+    clientSecret: secret,
+    robotCode: id,
   };
+}
+
+export function resolveDingTalkRobotCode(cfg?: DingTalkConfig): string {
+  return resolveDingTalkCredentials(cfg)?.robotCode || "";
+}
+
+export function resolveDingTalkClientId(cfg?: DingTalkConfig): string {
+  return resolveDingTalkCredentials(cfg)?.clientId || "";
 }
 
 export function resolveDingTalkAccount(params: {
@@ -29,7 +47,7 @@ export function resolveDingTalkAccount(params: {
     accountId: params.accountId?.trim() || DEFAULT_ACCOUNT_ID,
     enabled,
     configured: Boolean(creds),
-    appKey: creds?.appKey,
+    appKey: creds?.clientId,
     robotCode: creds?.robotCode,
   };
 }

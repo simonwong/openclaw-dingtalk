@@ -7,7 +7,7 @@ export async function probeDingTalk(cfg?: DingTalkConfig): Promise<DingTalkProbe
   if (!creds) {
     return {
       ok: false,
-      error: "missing credentials (appKey, appSecret)",
+      error: "missing credentials (clientId, clientSecret)",
     };
   }
 
@@ -20,21 +20,21 @@ export async function probeDingTalk(cfg?: DingTalkConfig): Promise<DingTalkProbe
     if (!accessToken) {
       return {
         ok: false,
-        appKey: creds.appKey,
+        appKey: creds.clientId,
         error: "Failed to get access token",
       };
     }
 
     return {
       ok: true,
-      appKey: creds.appKey,
+      appKey: creds.clientId,
       robotCode: creds.robotCode,
       connected: true,
     };
   } catch (err) {
     return {
       ok: false,
-      appKey: creds.appKey,
+      appKey: creds.clientId,
       error: err instanceof Error ? err.message : String(err),
     };
   }

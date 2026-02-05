@@ -3,31 +3,31 @@ import type { DingTalkConfig } from "./types.js";
 import { resolveDingTalkCredentials } from "./accounts.js";
 
 let cachedClient: DingTalkStreamClient | null = null;
-let cachedConfig: { appKey: string; appSecret: string } | null = null;
+let cachedConfig: { clientId: string; clientSecret: string } | null = null;
 
 export function createDingTalkClient(cfg: DingTalkConfig): DingTalkStreamClient {
   const creds = resolveDingTalkCredentials(cfg);
   if (!creds) {
-    throw new Error("DingTalk credentials not configured (appKey, appSecret required)");
+    throw new Error("DingTalk credentials not configured (clientId, clientSecret required)");
   }
 
   if (
     cachedClient &&
     cachedConfig &&
-    cachedConfig.appKey === creds.appKey &&
-    cachedConfig.appSecret === creds.appSecret
+    cachedConfig.clientId === creds.clientId &&
+    cachedConfig.clientSecret === creds.clientSecret
   ) {
     return cachedClient;
   }
 
   const client = new DingTalkStreamClient({
-    clientId: creds.appKey,
-    clientSecret: creds.appSecret,
+    clientId: creds.clientId,
+    clientSecret: creds.clientSecret,
     debug: Boolean((cfg as any).debug),
   });
 
   cachedClient = client;
-  cachedConfig = { appKey: creds.appKey, appSecret: creds.appSecret };
+  cachedConfig = { clientId: creds.clientId, clientSecret: creds.clientSecret };
 
   return client;
 }

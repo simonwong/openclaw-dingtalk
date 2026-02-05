@@ -214,13 +214,13 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
       } else {
         appKey = String(
           await prompter.text({
-            message: "Enter DingTalk AppKey (ClientID)",
+            message: "Enter DingTalk clientId",
             validate: (value) => (value?.trim() ? undefined : "Required"),
           }),
         ).trim();
         appSecret = String(
           await prompter.text({
-            message: "Enter DingTalk AppSecret (ClientSecret)",
+            message: "Enter DingTalk clientSecret",
             validate: (value) => (value?.trim() ? undefined : "Required"),
           }),
         ).trim();
@@ -233,13 +233,13 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
       if (!keep) {
         appKey = String(
           await prompter.text({
-            message: "Enter DingTalk AppKey (ClientID)",
+            message: "Enter DingTalk clientId",
             validate: (value) => (value?.trim() ? undefined : "Required"),
           }),
         ).trim();
         appSecret = String(
           await prompter.text({
-            message: "Enter DingTalk AppSecret (ClientSecret)",
+            message: "Enter DingTalk clientSecret",
             validate: (value) => (value?.trim() ? undefined : "Required"),
           }),
         ).trim();
@@ -247,13 +247,13 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
     } else {
       appKey = String(
         await prompter.text({
-          message: "Enter DingTalk AppKey (ClientID)",
+          message: "Enter DingTalk clientId",
           validate: (value) => (value?.trim() ? undefined : "Required"),
         }),
       ).trim();
       appSecret = String(
         await prompter.text({
-          message: "Enter DingTalk AppSecret (ClientSecret)",
+          message: "Enter DingTalk clientSecret",
           validate: (value) => (value?.trim() ? undefined : "Required"),
         }),
       ).trim();
@@ -267,8 +267,8 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
           dingtalk: {
             ...((((next as any).channels ?? {}) as any).dingtalk ?? {}),
             enabled: true,
-            appKey,
-            appSecret,
+            clientId: appKey,
+            clientSecret: appSecret,
           },
         },
       } as OpenClawConfig;
@@ -293,25 +293,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
       }
     }
 
-    // Robot code (optional)
-    const currentRobotCode = (next.channels?.dingtalk as DingTalkConfig | undefined)?.robotCode;
-    const robotCode = await prompter.text({
-      message: "Robot code (optional, for media download)",
-      placeholder: "dingxxxxxxxxx",
-      initialValue: currentRobotCode,
-    });
-    if (robotCode) {
-      next = {
-        ...(next as any),
-        channels: {
-          ...(((next as any).channels ?? {}) as any),
-          dingtalk: {
-            ...((((next as any).channels ?? {}) as any).dingtalk ?? {}),
-            robotCode: String(robotCode).trim(),
-          },
-        },
-      } as OpenClawConfig;
-    }
+    // robotCode is the same as clientId in this integration.
 
     // Group policy
     const groupPolicy = await prompter.select({

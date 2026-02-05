@@ -52,10 +52,11 @@ export async function sendViaOpenAPI(
 ): Promise<OpenAPISendResult> {
   const { config, target, msgKey, msgParam } = request;
   const token = await getAccessToken(config);
-  const robotCode = config.robotCode?.trim() || config.appKey?.trim() || "";
+  // In our integration, robotCode is the same as clientId.
+  const robotCode = (config as any).clientId?.trim?.() || config.appKey?.trim() || "";
 
   if (!robotCode) {
-    throw new Error("[DingTalk][OpenAPI] robotCode or appKey is required");
+    throw new Error("[DingTalk][OpenAPI] clientId is required");
   }
 
   const msgParamStr = JSON.stringify(msgParam);

@@ -375,13 +375,16 @@ export async function getOapiAccessToken(
       }
     }
 
-    // Manual token request - requires appKey and appSecret
-    if (!config.appKey || !config.appSecret) {
+    const clientId = (config as any).clientId || config.appKey;
+    const clientSecret = (config as any).clientSecret || config.appSecret;
+
+    // Manual token request - requires clientId and clientSecret
+    if (!clientId || !clientSecret) {
       return null;
     }
 
     const response = await fetch(
-      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(config.appKey)}&appsecret=${encodeURIComponent(config.appSecret)}`,
+      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
     );
 
     if (!response.ok) {
@@ -561,7 +564,7 @@ export async function downloadMediaDingTalk(params: {
       },
       body: JSON.stringify({
         downloadCode,
-        robotCode: robotCode || dingtalkCfg.robotCode,
+        robotCode: robotCode || (dingtalkCfg as any).clientId || dingtalkCfg.appKey,
       }),
     });
 
@@ -617,9 +620,15 @@ export async function uploadMediaDingTalk(params: {
   }
 
   try {
+    const clientId = (dingtalkCfg as any).clientId || dingtalkCfg.appKey;
+    const clientSecret = (dingtalkCfg as any).clientSecret || dingtalkCfg.appSecret;
+    if (!clientId || !clientSecret) {
+      throw new Error("DingTalk credentials not configured (clientId, clientSecret required)");
+    }
+
     // Get oapi token for media upload
     const oapiTokenResp = await fetch(
-      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(dingtalkCfg.appKey!)}&appsecret=${encodeURIComponent(dingtalkCfg.appSecret!)}`,
+      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
     );
 
     if (!oapiTokenResp.ok) {

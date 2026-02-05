@@ -65,8 +65,8 @@ export async function getAccessToken(config: DingTalkConfig): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      appKey: config.appKey,
-      appSecret: config.appSecret,
+      appKey: (config as any).clientId || config.appKey,
+      appSecret: (config as any).clientSecret || config.appSecret,
     }),
   });
 

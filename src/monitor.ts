@@ -28,7 +28,7 @@ export async function monitorDingTalkProvider(opts: MonitorDingTalkOpts = {}): P
   const dingtalkCfg = cfg.channels?.dingtalk as DingTalkConfig | undefined;
   const creds = resolveDingTalkCredentials(dingtalkCfg);
   if (!creds) {
-    throw new Error("DingTalk credentials not configured (appKey, appSecret required)");
+    throw new Error("DingTalk credentials not configured (clientId, clientSecret required)");
   }
 
   const log = opts.runtime?.log ?? console.log;
