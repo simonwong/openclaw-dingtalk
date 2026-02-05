@@ -1,5 +1,5 @@
 import axios from "axios";
-import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
+import { StreamClient as DWClient, TOPIC_ROBOT } from "./dingtalk_stream/index.js";
 import type { CoreConfig, DingtalkInboundMessage } from "./types.js";
 import { resolveDingtalkAccount } from "./accounts.js";
 import { handleDingtalkInbound } from "./inbound.js";

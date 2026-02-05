@@ -33,6 +33,9 @@ export type DingTalkAccountConfig = {
   blockStreaming?: boolean;
   blockStreamingCoalesce?: unknown;
 
+  // Best-effort local context
+  includeRecentMessages?: number;
+
   debug?: boolean;
   showThinking?: boolean;
 };

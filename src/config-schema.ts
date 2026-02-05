@@ -50,6 +50,9 @@ export const DingTalkAccountSchemaBase = z
     blockStreaming: z.boolean().optional(),
     blockStreamingCoalesce: BlockStreamingCoalesceSchema.optional(),
 
+    // Best-effort local context (not fetched from DingTalk OpenAPI)
+    includeRecentMessages: z.number().int().min(0).max(20).optional(),
+
     debug: z.boolean().optional(),
     showThinking: z.boolean().optional(),
   })

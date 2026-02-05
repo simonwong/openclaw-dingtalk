@@ -10,6 +10,35 @@ import { sendDingtalkTextViaSessionWebhook } from "./send.js";
 
 const CHANNEL_ID = "dingtalk" as const;
 
+const recentByConversation = new Map<string, Array<{ ts: number; from: string; text: string }>>();
+
+function recordRecent(params: { accountId: string; conversationId: string; ts: number; from: string; text: string }) {
+  const key = `${params.accountId}:${params.conversationId}`;
+  const list = recentByConversation.get(key) ?? [];
+  list.push({ ts: params.ts, from: params.from, text: params.text });
+  while (list.length > 50) {
+    list.shift();
+  }
+  recentByConversation.set(key, list);
+}
+
+function formatRecentBlock(params: {
+  accountId: string;
+  conversationId: string;
+  take: number;
+  excludeTs?: number;
+}): string {
+  const key = `${params.accountId}:${params.conversationId}`;
+  const list = recentByConversation.get(key) ?? [];
+  const filtered = params.excludeTs ? list.filter((x) => x.ts !== params.excludeTs) : list;
+  const slice = filtered.slice(Math.max(0, filtered.length - params.take));
+  if (slice.length === 0) {
+    return "";
+  }
+  const lines = slice.map((m) => `- ${m.from}: ${m.text}`);
+  return `\n\nRecent group context (local cache):\n${lines.join("\n")}`;
+}
+
 async function deliverDingtalkReply(params: {
   payload: { text?: string; mediaUrls?: string[]; mediaUrl?: string; replyToId?: string };
   sessionWebhook: string;
@@ -152,6 +181,19 @@ export async function handleDingtalkInbound(params: {
     agentId: route.agentId,
   });
 
+  const recentTake = Number(account.config.includeRecentMessages ?? 0);
+  const recentBlock =
+    isGroup && recentTake > 0
+      ? formatRecentBlock({
+          accountId: account.accountId,
+          conversationId: message.conversationId,
+          take: recentTake,
+        })
+      : "";
+
+  const attachmentHint = message.downloadCode ? `\n\nAttachment downloadCode: ${message.downloadCode}` : "";
+  const rawBodyWithContext = `${rawBody}${attachmentHint}${recentBlock}`;
+
   const previousTimestamp = core.channel.session.readSessionUpdatedAt({
     storePath,
     sessionKey: route.sessionKey,
@@ -167,7 +209,7 @@ export async function handleDingtalkInbound(params: {
     timestamp: message.timestamp,
     previousTimestamp,
     envelope: envelopeOptions,
-    body: rawBody,
+    body: rawBodyWithContext,
   });
 
   const ctxPayload = core.channel.reply.finalizeInboundContext({
@@ -191,6 +233,14 @@ export async function handleDingtalkInbound(params: {
     OriginatingChannel: CHANNEL_ID,
     OriginatingTo: `dingtalk:${message.conversationId}`,
     CommandAuthorized: commandGate.commandAuthorized,
+  });
+
+  recordRecent({
+    accountId: account.accountId,
+    conversationId: message.conversationId,
+    ts: message.timestamp,
+    from: fromLabel,
+    text: rawBody,
   });
 
   await core.channel.session.recordInboundSession({
